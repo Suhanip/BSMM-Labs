@@ -128,16 +128,16 @@ recipe_model
 
 ```{r}
 #Method2: add steps for normalization
-recipe_model2 <- pivoted_item %>% 
-  recipe( ~ .) %>%
-  update_role(name, category, new_role = 'id') %>%
-  step_center(all_numeric()) %>%
-  step_scale(all_numeric()) %>%
-  step_pca(all_numeric()) %>%
-  prep()
+#|recipe_model2 <- pivoted_item %>% 
+#|  recipe( ~ .) %>%
+#|  update_role(name, category, new_role = 'id') %>%
+#|  step_center(all_numeric()) %>%
+#|  step_scale(all_numeric()) %>%
+#|  step_pca(all_numeric()) %>%
+#|  prep()
 
-summary(recipe_model2)
-recipe_model2
+#|summary(recipe_model2)
+#|recipe_model2
 ```
 
 ### Exercise 4
@@ -149,12 +149,12 @@ recipe_model %>%
 ```
 
 ```{r}
-recipe_model2 %>%
-  recipes::tidy(1) %>%
-  dplyr::arrange(desc(value))
+#recipe_model2 %>%
+#  recipes::tidy(1) %>%
+#  dplyr::arrange(desc(value))
 ```
 
-On average the most used ingredient in the Boston Cocktails dataset is **orange juice** according the first normalization method and its **gin** according to the second normalization method.
+On average the most used ingredient in the Boston Cocktails dataset is **orange juice**.
 
 ### Exercise 5
 
