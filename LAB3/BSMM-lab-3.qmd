@@ -1,0 +1,215 @@
+---
+title: "BSMM-lab-3"
+subtitle: "BSMM 8740 Fall 2023"
+author: "Suhani Prajapati"
+date: "October 13, 2023"
+format: html
+editor: visual
+self-contained: true
+---
+
+## Setup
+
+Load packages and data:
+
+```{r load-pkg-data}
+library(magrittr)   # the pipe
+library(tidyverse)  # for data wrangling + visualization
+library(tidymodels) # for modeling
+library(gt)         # for pretty tables
+#| message: false
+#| Read the data
+boston_cocktails <- readr::read_csv('data/boston_cocktails.csv')
+```
+
+## Exercises
+
+### Exercise 1
+
+```{r}
+#view the data
+#View(boston_cocktails)
+```
+
+```{r}
+#Assess the quality of data
+#install.packages("skimr")
+library(skimr)
+skimr::skim(boston_cocktails)
+```
+
+```{r}
+#install.packages("DataExplorer")
+library(DataExplorer)
+boston_cocktails %>% DataExplorer::introduce()
+```
+
+```{r}
+boston_cocktails %>% summary()
+```
+
+```{r}
+#find the median
+boston_cocktails %>%
+  summarize(
+    Median = median(measure_number)
+  )
+```
+
+The median measure amount across all cocktails is **1**.
+
+### Exercise 2
+
+```{r}
+#selecting the name, category, ingredients, measure_number
+selected_items <- boston_cocktails %>% dplyr::select(name, category, ingredient, measure_number)
+```
+
+```{r}
+#approach1: pivoting the table for each ingredients by grouping the ingredients and counting the number using summarize
+#This only gives one column of ingredient.
+#|pivoted_item <- selected_items %>%
+#|group_by(ingredient) %>%
+#|summarize(
+#|count_of_ingredient = n()
+#|)
+
+#approach2: pivot_wider is used since it increases the number of columns and reduces the number of rows.
+pivoted_item <- selected_items %>%
+  pivot_wider(
+    names_from = ingredient,
+    values_from = measure_number,
+    values_fill = 0
+  )
+
+pivoted_item
+```
+
+```{r}
+#install.packages("janitor")
+library(janitor)
+#clean the data and remove NA values
+pivoted_item <- pivoted_item %>%
+  janitor::clean_names() %>%
+  drop_na()
+
+pivoted_item
+```
+
+```{r}
+gin_leap_frog_highball <- pivoted_item %>%
+  filter(name == "Leap Frog Highball") %>%
+  select(gin)
+
+gin_leap_frog_highball
+```
+
+The **Leap Frog Highball** contains **2** of gin
+
+### Exercise 3
+
+```{r}
+#We'll use the cleaned pivoted data (pivoted_item) as our dataset.
+library(recipes)
+#create the recipe object
+#Method1: directly use step_normalization method to normalize the predictors
+recipe_model <- pivoted_item %>%
+  recipe( ~ .) %>%
+  update_role(name, category, new_role = 'id') %>%
+  step_normalize(all_numeric()) %>% 
+  step_pca(all_numeric()) %>%
+  prep()
+
+summary(recipe_model)
+recipe_model
+```
+
+**40** predictor variables are prepped by the recipe.
+
+```{r}
+#Method2: add steps for normalization
+recipe_model2 <- pivoted_item %>% 
+  recipe( ~ .) %>%
+  update_role(name, category, new_role = 'id') %>%
+  step_center(all_numeric()) %>%
+  step_scale(all_numeric()) %>%
+  step_pca(all_numeric()) %>%
+  prep()
+
+summary(recipe_model2)
+recipe_model2
+```
+
+### Exercise 4
+
+```{r}
+recipe_model %>%
+  recipes::tidy(1) %>%
+  dplyr::arrange(desc(value))
+```
+
+```{r}
+recipe_model2 %>%
+  recipes::tidy(1) %>%
+  dplyr::arrange(desc(value))
+```
+
+On average the most used ingredient in the Boston Cocktails dataset is **orange juice** according the first normalization method and its **gin** according to the second normalization method.
+
+### Exercise 5
+
+```{r}
+drinks <- recipe_model %>%
+  recipes::tidy(2)
+drinks_1_to_5 <- drinks %>%
+  filter(component %in% c("PC1", "PC2", "PC3", "PC4", "PC5"))
+
+drinks_1_to_5
+```
+
+```{r}
+drinks_1_to_5 %>%
+  ggplot(aes(value, terms, fill = terms)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~component, nrow = 1) +
+  labs(y = NULL) + 
+  theme(axis.text = element_text(size = 7),
+        axis.title = element_text(size = 12, face = "bold"))
+```
+
+Describe the drinks represented by PC1?
+
+**the drinks represented by PC1 are mostly syrupy and sweet with moderate to high alcohol content.**
+
+### Exercise 6
+
+```{r}
+drinks %>%
+  filter(component %in% c("PC1", "PC2", "PC3", "PC4")) %>%
+  group_by(component) %>%
+  slice_max(abs(value), n=8) %>%
+  gt() %>%
+  data_color(
+    columns = c(value),
+    colors = scales::col_numeric(
+      palette = c("red", "yellow"),
+      domain = c(-1,1)
+    )
+  )
+```
+
+The characteristic alcoholic beverage of each of the first 4 principle components is **gin and vodka**.
+
+### Exercise 7
+
+```{r}
+recipes::bake(recipe_model, pivoted_item) %>%
+  ggplot(aes(PC1, PC2, label = name)) +
+  geom_point(aes(color = category), alpha = 0.7, size = 2) + 
+  geom_text(check_overlap = TRUE, hjust = "inward") + 
+  labs(color = NULL)
+```
+
+How would you interpret the results of a PCA analysis for a client?
+
+**As per the graph, PC1 and PC2 do not focus on the cocktail classics or light cocktail classics as they have negative values for light cocktail classics. PC1 on one hand focuses on unmixed heavy alcohol and less on cocktails, on the other hand, PC2 focuses more on cocktail oriented drinks and less straightup alcohol.**
