@@ -1,0 +1,481 @@
+---
+title: "BSMM-lab-4"
+subtitle: "BSMM 8740 Fall 2023"
+author: "Suhani Prajapati"
+date: "25 October 2023"
+format: html
+editor: visual
+self-contained: true
+---
+
+::: callout-note
+## REMINDER:
+
+Be sure to edit this document (see above) to include your name (and the date)
+:::
+
+## Setup
+
+Load packages and data:
+
+```{r}
+#load packages
+library(tidyverse)  # for data wrangling + visualization
+library(tidymodels) # for modeling
+library(knitr)      # for pretty printing of tables
+library(ggplot2)
+```
+
+```{r load-pkg-data}
+#| message: false
+boston <- ISLR2::Boston
+summary(boston)
+```
+
+## Exercises
+
+### Exercise 1
+
+```{r}
+#check the dimensions of the data
+dim(boston)
+```
+
+```{r}
+ggplot(data = boston, aes(x = lstat, y = medv, color = rad)) + geom_point(size = 2)
+
+#we see that the graph shows the curvilinear model might fits better here.
+```
+
+```{r}
+#Correlation coefficient of medv and lstat in order to find the correlation between lstat and medv
+attach(boston)
+
+cor(lstat, medv)
+#-ve coefficient depicts that these are negatively correlated to each other as one increases, the other decreases and vice versa.
+```
+
+```{r}
+#Hypothesis testing for testing the linear correlation
+cor.test(lstat, medv)
+```
+
+```{r}
+#H0 = there is no linear correlation between medv and lstat
+#H1 = there is linear correlation between medv and lstat
+p_value_cor <- cor.test(lstat, medv)$p.value
+p_value_cor
+
+#as the p_value is <0.05, we can reject the H0, Hence there is a linear relation between lstat and medv
+```
+
+```{r}
+#apply the lm model
+lm_model = lm(medv ~ lstat)
+
+lm_model
+
+
+#coefficient for lstat
+coefficients(lm_model)
+```
+
+The intercept and the coefficient of `lstat` in this model are: intercept = **34.55**; coefficient = **-0.95(95% confident)**
+
+### Exercise 2
+
+```{r}
+new_lstat_data <- tibble(lstat = c(5,10,15,20))
+predict_lm <- stats::predict.lm(lm_model, new_lstat_data, interval = "confidence")
+
+predict_lm
+
+summary_table <- data.frame(
+  lstat = new_lstat_data$lstat,
+  predict_lm
+)
+
+summary_table
+```
+
+```{r}
+#install.packages("performance")
+library(performance)
+check_model(lm_model, check = c("linearity", "qq", "homogeneity", "outliers"))
+
+check_outliers(lm_model)
+```
+
+Are there any overly influential observations in this dataset?
+
+**NO** there are some overly influential observations in the dataset.
+
+### Exercise 3
+
+```{r}
+lm_model2 <- lm(medv ~., data = boston)
+
+#check if the predictors are collinear or not.
+collinearity <- performance::check_collinearity(lm_model2)
+
+collinearity
+```
+
+Which predictors in this dataset might be redundant for predicting `medv`?
+
+**"rad" and "tax"** might be redundant for predicting medv.
+
+### Exercise 4
+
+```{r}
+#for dat0
+N <- 500
+set.seed(1966)
+
+dat0 <- tibble::tibble(
+  price0 = 10+rnorm(500)
+  , demand0 = 30-(price0 + rnorm(500))
+  , unobserved0 = 0.45*price0 + 0.77*demand0 + rnorm(500)
+)
+```
+
+```{r}
+#for dat1
+set.seed(1966)
+
+dat1 <- tibble::tibble(
+  unobserved1 = rnorm(500)
+  , price1 = 10 + unobserved1 + rnorm(500)
+  , demand1 = 23 -(0.5*price1 + unobserved1 + rnorm(500))
+)
+```
+
+```{r}
+#lm model to predict demand0 and price0
+lm_model_dat0 <- lm(demand0 ~ price0, dat0)
+
+#lm model for predicting demand1 and price1
+lm_model_dat1 <- lm(demand1 ~ price1, dat1)
+```
+
+```{r}
+#plot for dat0
+dat0 %>% ggplot(aes(x=price0,y=demand0)) + 
+         # plot the points
+         geom_point() +
+         # add a straight line to the plot
+         geom_abline(
+          data = tidy(lm_model_dat0)
+            , aes(intercept = estimate[1], slope = estimate[2])
+            , colour = "red"
+         )
+```
+
+```{r}
+dat1 %>% ggplot(aes(x=price1,y=demand1)) + 
+         # plot the points
+         geom_point() +
+         # add a straight line to the plot
+         geom_abline(
+          data = tidy(lm_model_dat1)
+            , aes(intercept = estimate[1], slope = estimate[2])
+            , colour = "red"
+         )
+```
+
+```{r}
+summary(lm_model_dat0)
+summary(lm_model_dat1)
+```
+
+Which model returns the (approximately) correct dependence of demand on price, as given in the data generation process?
+
+lm(demand0 \~ price0) or lm(demand1 \~ price1) ?
+
+As we compare the R-squared, p-value and the plot for both the models, **"Second dataset(dat1)"** returns the correct dependence of demand on price.
+
+### Exercise 5
+
+```{r}
+lm_model_dat0_2 <- lm(demand0 ~ price0+unobserved0, dat0)
+lm_model_dat1_2 <- lm(demand1 ~ price1+unobserved1, dat1)
+
+summary(lm_model_dat0_2)
+summary(lm_model_dat1_2)
+```
+
+After controling for the unobservable covariates, hich model now returns the (approximately) correct dependence of demand on price, as given in the data generation process?
+
+lm(demand0 \~ price0 + unobserved0) or lm(demand1 \~ price1 + unobserved1) ?
+
+**Again by comparing both models, the R-squared value for the second one is more and hence [Second dataset(dat1)]{.underline} might return the correct dependence of demand and price.**
+
+What can you conclude from these exercises 4 and 5?
+
+**From the above two exercise we can conclude that adding more predictors will directly effect the mode accuracy. If predictor is proportional or directly related to the outcomes than it will increase the mode accuracy or else it will decrease.**
+
+### Exercise 6
+
+```{r}
+#| echo: true
+#| eval: false
+dat <- readxl::read_xlsx("data/2023 FE Guide for DOE-release dates before 7-28-2023.xlsx")
+
+View(dat)
+```
+
+```{r}
+#selecting and cleaning
+new_selected_data <- dat %>%
+  select(
+    `Comb FE (Guide) - Conventional Fuel`, 
+    `Eng Displ`,
+    `# Cyl`, 
+    `Transmission` , 
+    `# Gears`, 
+    `Air Aspiration Method Desc`, 
+    `Regen Braking Type Desc`, 
+    `Batt Energy Capacity (Amp-hrs)` , 
+    `Drive Desc`, 
+    `Fuel Usage Desc - Conventional Fuel`, 
+    `Cyl Deact?`, 
+    `Var Valve Lift?`
+  ) %>%
+  janitor::clean_names()
+
+cars_23 <- new_selected_data
+```
+
+```{r}
+cars_23 %>% DataExplorer::introduce() %>% DataExplorer::plot_missing()
+```
+
+```{r}
+cars_23 <- cars_23 %>%
+  mutate(
+    comb_fe_guide_conventional_fuel = as.integer(comb_fe_guide_conventional_fuel),
+    number_cyl = as.integer(number_cyl),
+    number_gears = as.integer(number_gears)
+  )
+```
+
+```{r}
+cars_23 <- cars_23 %>%
+  replace_na(list(
+    batt_energy_capacity_amp_hrs = 0,
+    regen_braking_type_desc = ""
+  ))
+```
+
+```{r}
+cars_23 <- cars_23 %>%
+  mutate(
+    transmission = factor(transmission),
+    air_aspiration_method_desc = factor(air_aspiration_method_desc),
+    regen_braking_type_desc = factor(regen_braking_type_desc),
+    drive_desc = factor(drive_desc),
+    fuel_usage_desc_conventional_fuel = factor(fuel_usage_desc_conventional_fuel),
+    cyl_deact = factor(cyl_deact),
+    var_valve_lift = factor(var_valve_lift)
+  )
+```
+
+```{r}
+library(recipes)
+
+# Create a recipe
+car_recipe <- recipe(comb_fe_guide_conventional_fuel ~ ., data = cars_23) %>%
+  step_center(all_numeric()) %>%    # Centering for all numeric variables
+  step_scale(all_numeric()) %>%    # Scaling for all numeric variables
+  step_dummy(all_factor())         # Creating dummy variables for all factor variables
+
+car_recipe
+```
+
+How many predictor variables are there in `cars_23` ?
+
+**There are 11 predictor values.**
+
+### Exercise 7
+
+```{r}
+set.seed(1966)
+
+# sample 75% of the rows of the cars_23 dataset to make the training set
+train <- cars_23 %>% 
+  # make an ID column for use as a key
+  tibble::rowid_to_column("ID") %>% 
+  # sample the rows
+  dplyr::sample_frac(0.75)
+
+# remove the training dataset from the original dataset to make the training set
+test  <- 
+  dplyr::anti_join(
+    cars_23 %>% tibble::rowid_to_column("ID") # add a key column to the original data
+    , train
+    , by = 'ID'
+  )
+
+# drop the ID column from training and test datasets
+train %>% dplyr::select(-ID); 
+test %>% dplyr::select(-ID)
+```
+
+```{r}
+prepped_data <- recipes::prep(car_recipe, training = train)
+
+#baked data for training and testing
+baked_training <- recipes::bake(prepped_data, new_data = train)
+baked_testing <- recipes::bake(prepped_data, new_data = test)
+
+#number of columns
+ncol(baked_training)
+ncol(baked_testing)
+```
+
+After these two steps how many columns are in the data? Why does this differ from the last step?
+
+**Centering and Scaling**: By centering and scaling numerical variables, one can modify their original values to have a standard deviation of one and a mean of zero. For every initial numerical variable, this may produce two columns (centred and scaled).
+
+**Dummy Variables**: A single categorical variable can be expanded into many binary columns (one for each level of the factor variable) by creating dummy variables for factor variables.
+
+Because of this, the baked data usually has more columns than the original data, particularly if these modifications are needed for factor and numeric variables.
+
+### Exercise 8
+
+```{r}
+install.packages("xgboost")
+library(xgboost)
+untuned_xgb <-
+  xgboost::xgboost(
+    data = baked_training %>% dplyr::select(-comb_fe_guide_conventional_fuel) %>% as.matrix(), 
+    label = baked_training %>% dplyr::select(comb_fe_guide_conventional_fuel) %>% as.matrix(),
+    nrounds = 1000,
+    objective = "reg:squarederror",
+    early_stopping_rounds = 3,
+    max_depth = 6,
+    eta = .25
+    , verbose = FALSE
+  )
+```
+
+```{r}
+# create predictions using the test data and the fitted model
+yhat <- predict(
+  untuned_xgb
+  , baked_testing %>% 
+    dplyr::select(-comb_fe_guide_conventional_fuel) %>% 
+    as.matrix() 
+)
+```
+
+```{r}
+y <- baked_testing %>%
+  dplyr::select(comb_fe_guide_conventional_fuel) %>%
+  as.matrix()
+```
+
+```{r}
+install.packages("caret")
+library(caret)
+rmse <- sqrt(mean((y - yhat)^2))
+
+results <- postResample(yhat, y)
+print(results)
+print(rmse)
+```
+
+The RMSE for the un-tuned model is **0.2446266**.
+
+### Exercise 9
+
+```{r}
+#create hyperparameter grid
+hyper_grid <- expand.grid(max_depth = seq(3, 6, 1), eta = seq(.2, .35, .01))  
+
+# initialize our metric variables
+xgb_train_rmse <- NULL
+xgb_test_rmse  <- NULL
+
+for (j in 1:nrow(hyper_grid)) {
+  set.seed(123)
+  m_xgb_untuned <- xgboost::xgb.cv(
+    data = baked_training %>% dplyr::select(-comb_fe_guide_conventional_fuel) %>% as.matrix(), 
+    label = baked_training %>% dplyr::select(comb_fe_guide_conventional_fuel) %>% as.matrix(),
+    nrounds = 1000,
+    objective = "reg:squarederror",
+    early_stopping_rounds = 3,
+    nfold = 5,
+    max_depth = hyper_grid$max_depth[j],
+    eta = hyper_grid$eta[j],
+    verbose = FALSE
+  )
+  
+  xgb_train_rmse[j] <- m_xgb_untuned$evaluation_log$train_rmse_mean[m_xgb_untuned$best_iteration]
+  xgb_test_rmse[j] <- m_xgb_untuned$evaluation_log$test_rmse_mean[m_xgb_untuned$best_iteration]
+}    
+
+best <- hyper_grid[which(xgb_test_rmse == min(xgb_test_rmse)),]; best # there may be ties
+```
+
+```{r}
+#training the tuned model
+set.seed(123)
+tuned_xgb_model <- xgboost::xgboost(
+  data = baked_training %>% dplyr::select(-comb_fe_guide_conventional_fuel) %>% as.matrix(),
+  label = baked_training %>% dplyr::select(comb_fe_guide_conventional_fuel) %>% as.matrix(),
+  nrounds = 1000,
+  objective = "reg:squarederror",
+  early_stopping_rounds = 3,
+  max_depth = best$max_depth,
+  eta = best$eta,
+  verbose = FALSE
+)
+
+#predicting y_hat for tuned model
+yhat_tuned <- predict(
+  tuned_xgb_model
+  , baked_testing %>% 
+    dplyr::select(-comb_fe_guide_conventional_fuel) %>% 
+    as.matrix() 
+)
+
+rmse_tuned <- sqrt(mean((y - yhat_tuned)^2))
+print(rmse_tuned)
+```
+
+```{r}
+# Calculate the percentage improvement in RMSE
+improvement_percentage <- ((rmse - rmse_tuned) / rmse) * 100
+
+cat("Percentage Improvement in RMSE:", improvement_percentage, "%\n")
+```
+
+Is the tuned model better than the un-tuned model? If better, how much has the RMSE improved (in %).
+
+The RMSE value for the tuned model has decreased. %age improvement is **0.8305653%**
+
+### Exercise 10
+
+```{r}
+importance_prediction <- xgboost::xgb.importance(model = tuned_xgb_model)
+
+importance_prediction
+
+#sorting to get the top10
+sorted_importance <- importance_prediction[order(-importance_prediction$Gain), ]
+
+top_10_predictors <- sorted_importance$Feature[1:10]
+```
+
+```{r}
+xgb.plot.importance(importance_matrix = importance_prediction[1:10], xlab = "Importance")
+
+
+most_important_feature <- sorted_importance$Feature[1]
+most_important_feature
+```
+
+Per this model, what is the most important feature for predicting fuel efficiency?
+
+**"eng_displ"**
